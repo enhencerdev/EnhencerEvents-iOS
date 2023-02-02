@@ -2,6 +2,8 @@ import Foundation
 import FacebookCore
 import FBSDKCoreKit
 import FirebaseAnalytics
+import AppTrackingTransparency
+
 
 
 public struct EnhencerEvents {
@@ -9,16 +11,17 @@ public struct EnhencerEvents {
     var userID: String;
     var visitorID: String;
     var type = "ecommerce";
-    var advertiserTrackingEnabled = false
-    var appTrackingEnabled = false
+    var advertiserTrackingEnabled = 1
+    var appTrackingEnabled = true
+    var fbExternalID = "";
     //var listingUrl = "https://collect.enhencer.com/api/listings/";
     //var productUrl = "https://collect.enhencer.com/api/products/";
     //var purchaseUrl = "https://collect.enhencer.com/api/purchases/";
     //var customerUrl = "https://collect.enhencer.com/api/customers/";
-    var listingUrl = "http://localhost:4000/api/listings/";
-    var productUrl = "http://localhost:4000/api/products/";
-    var purchaseUrl = "http://localhost:4000/api/purchases/";
-    var customerUrl = "http://localhost:4000/api/customers/";
+    var listingUrl = "http://192.168.8.198:4000/api/listings/";
+    var productUrl = "http://192.168.8.198:4000/api/products/";
+    var purchaseUrl = "http://192.168.8.198:4000/api/purchases/";
+    var customerUrl = "http://192.168.8.198:4000/api/customers/";
     
     public static var shared = EnhencerEvents()
     
@@ -36,8 +39,27 @@ public struct EnhencerEvents {
         
     }
     
-    public mutating func config (token: String, advertiserTrackingEnabled: Bool = false, applicationTrackingEnabled: Bool = false ){
+    public mutating func config (token: String ){
         self.userID = token
+        setTrackingStatus()
+    }
+    
+    
+    private mutating func setTrackingStatus (){
+        if #available(iOS 14.0, *) {
+            self.advertiserTrackingEnabled = (ATTrackingManager.trackingAuthorizationStatus == .denied) ? 0 : 1
+        }
+        
+        do {
+            let userData = try JSONSerialization.jsonObject(with: AppEvents.shared.getUserData()!.data(using: .utf8)! , options: []) as! [String: Any]
+            self.fbExternalID = userData["external_id"] as? String ?? self.visitorID
+            if let id = userData["external_id"] as? String {
+                self.fbExternalID = id
+            } else {
+                self.fbExternalID = self.visitorID
+                AppEvents.shared.setUserData(self.visitorID, forType: FBSDKAppEventUserDataType(rawValue: "external_id"))
+            }
+        } catch {}
     }
     
     private func generateVisitorID() -> String {
@@ -124,12 +146,12 @@ public struct EnhencerEvents {
         let parameters: [String: Any] = [
             "type": self.type,
             "visitorID": self.visitorID,
-            "deviceType": "iOS",
             "userID": self.userID,
             "id": self.visitorID,
-            "eventSourceUrl": "dummy_source",
-            "fbp": "fbp replacement",
-            "userAgent": "user agent"
+            "deviceOsVersion": UIDevice.current.systemVersion,
+            "deviceType": "i2",
+            "advertiserTrackingEnabled": self.advertiserTrackingEnabled,
+            "externalID": self.fbExternalID
         ]
         let _ = sendRequest(toUrl: self.customerUrl + self.visitorID, withParameters: parameters, requestMethod: "PUT", completion: self.pushResult(apiResponse:))
     }
@@ -137,29 +159,36 @@ public struct EnhencerEvents {
     private func pushResult(apiResponse: [String: Any]) {
         
         for aud in apiResponse["audiences"] as! [[String:String]] {
-            let params = [
-                AppEvents.ParameterName(rawValue: "eventID"): aud["eventId"]!
-            ]
-            
-            // push to facebook
-            AppEvents.shared.logEvent(AppEvents.Name(aud["name"]!), parameters: params)
-            
-            // push to firebase
-            Analytics.logEvent(aud["name"]!, parameters: [:])
+            self.pushToFacebook(audience: aud)
+            self.pushToGoogle(audience: aud)
         }
+    }
+    
+    private func pushToFacebook (audience: [String:String]){
+        
+        let params = [
+            AppEvents.ParameterName(rawValue: "eventID"): audience["eventId"]!,
+        ]
+        
+        AppEvents.shared.logEvent(AppEvents.Name(audience["name"]!), parameters: params)
+    }
+    
+    private func pushToGoogle (audience: [String:String]){
+        // push to firebase
+        Analytics.logEvent(audience["name"]!, parameters: [:])
     }
     
     
     
     private func sendRequest (toUrl: String, withParameters: [String: Any], requestMethod: String? = "POST", completion: (([String: Any]) -> ())? = { _ in return }) -> Bool {
         var request = URLRequest(url: URL(string: toUrl)!)
-        request.setValue("text/plain", forHTTPHeaderField: "Content-Type")
-        request.setValue("text/plain", forHTTPHeaderField: "Accept")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
         request.httpMethod = requestMethod
         
         do {
             let body = try JSONSerialization.data(withJSONObject: withParameters)
-            request.httpBody = Data(String(decoding: body, as: UTF8.self).utf8)
+            request.httpBody = Data(body)
             
         } catch {
             print("error ", error)
@@ -172,13 +201,13 @@ public struct EnhencerEvents {
                 let response = response as? HTTPURLResponse,
                 error == nil
             else {                                                               // check for fundamental networking error
-                print("error", error ?? URLError(.badServerResponse))
+                //print("error", error ?? URLError(.badServerResponse))
                 return
             }
             
             guard (200 ... 300) ~= response.statusCode else {                    // check for http errors
-                print("statusCode should be 2xx, but is \(response.statusCode)")
-                print("response = \(response)")
+                //print("statusCode should be 2xx, but is \(response.statusCode)")
+                //print("response = \(response)")
                 return
             }
             do {
