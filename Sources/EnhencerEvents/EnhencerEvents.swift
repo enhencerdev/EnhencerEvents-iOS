@@ -1,8 +1,17 @@
 import Foundation
-import FacebookCore
-import FBSDKCoreKit
-import FirebaseAnalytics
 import AppTrackingTransparency
+
+#if canImport(FacebookCore)
+import FacebookCore
+#endif
+
+#if canImport(FacebookCore)
+import FBSDKCoreKit
+#endif
+
+#if canImport(FirebaseAnalytics)
+import FirebaseAnalytics
+#endif
 
 
 
@@ -42,6 +51,7 @@ public struct EnhencerEvents {
     public mutating func config (token: String ){
         self.userID = token
         setTrackingStatus()
+        print(AppEvents.shared)
     }
     
     
