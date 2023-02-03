@@ -5,7 +5,7 @@ import AppTrackingTransparency
 import FacebookCore
 #endif
 
-#if canImport(FacebookCore)
+#if canImport(FacebookCoreKit)
 import FBSDKCoreKit
 #endif
 
@@ -23,14 +23,10 @@ public struct EnhencerEvents {
     var advertiserTrackingEnabled = 1
     var appTrackingEnabled = true
     var fbExternalID = "";
-    //var listingUrl = "https://collect.enhencer.com/api/listings/";
-    //var productUrl = "https://collect.enhencer.com/api/products/";
-    //var purchaseUrl = "https://collect.enhencer.com/api/purchases/";
-    //var customerUrl = "https://collect.enhencer.com/api/customers/";
-    var listingUrl = "http://192.168.8.198:4000/api/listings/";
-    var productUrl = "http://192.168.8.198:4000/api/products/";
-    var purchaseUrl = "http://192.168.8.198:4000/api/purchases/";
-    var customerUrl = "http://192.168.8.198:4000/api/customers/";
+    var listingUrl = "https://collect-app.enhencer.com/api/listings/";
+    var productUrl = "https://collect-app.enhencer.com/api/products/";
+    var purchaseUrl = "https://collect-app.enhencer.com/api/purchases/";
+    var customerUrl = "https://collect-app.enhencer.com/api/customers/";
     
     public static var shared = EnhencerEvents()
     
@@ -48,6 +44,10 @@ public struct EnhencerEvents {
         
     }
     
+    /// Configures and initializes the EnhencerEvents struct.
+    ///
+    /// - Parameters:
+    ///     - token: Your Enhencer user ID provided to you.
     public mutating func config (token: String ){
         self.userID = token
         setTrackingStatus()
@@ -61,15 +61,25 @@ public struct EnhencerEvents {
         }
         
         do {
-            let userData = try JSONSerialization.jsonObject(with: AppEvents.shared.getUserData()!.data(using: .utf8)! , options: []) as! [String: Any]
-            self.fbExternalID = userData["external_id"] as? String ?? self.visitorID
-            if let id = userData["external_id"] as? String {
-                self.fbExternalID = id
+            
+            if (AppEvents.shared.getUserData() != nil) {
+                let userData = try JSONSerialization.jsonObject(with: AppEvents.shared.getUserData()?.data(using: .utf8)! ?? "{}".data(using: .utf8)! , options: []) as! [String: Any]
+                self.fbExternalID = userData["external_id"] as? String ?? self.visitorID
+                if let id = userData["external_id"] as? String {
+                    self.fbExternalID = id
+                } else {
+                    self.fbExternalID = self.visitorID
+                    AppEvents.shared.setUserData(self.visitorID, forType: FBSDKAppEventUserDataType(rawValue: "external_id"))
+                }
             } else {
                 self.fbExternalID = self.visitorID
                 AppEvents.shared.setUserData(self.visitorID, forType: FBSDKAppEventUserDataType(rawValue: "external_id"))
             }
-        } catch {}
+            
+        } catch {
+            self.fbExternalID = self.visitorID
+            AppEvents.shared.setUserData(self.visitorID, forType: FBSDKAppEventUserDataType(rawValue: "external_id"))
+        }
     }
     
     private func generateVisitorID() -> String {
@@ -77,6 +87,10 @@ public struct EnhencerEvents {
         return String((0..<8).map{ _ in letters.randomElement()! })
     }
     
+    /// Sends the product listing page view event to Enhencer.
+    ///
+    /// - Parameters:
+    ///     - category: The category of the page viewed, ex. 'ANC Headphones'.
     public func listingPageView(category: String) {
         let parameters: [String: Any] = [
             "type": self.type,
@@ -94,6 +108,12 @@ public struct EnhencerEvents {
         
     }
     
+    /// Sends the product detail page view event to Enhencer.
+    ///
+    /// - Parameters:
+    ///     - productID: The ID of the product that is being viewed.
+    ///     - productCategory: The category of the product that is being viewed.
+    ///     - productPrice: The price of the product that is being viewed.
     public func productPageView(productID: String, productCategory: String, productPrice: Int) {
         let parameters: [String: Any] = [
             "type": self.type,
@@ -113,6 +133,10 @@ public struct EnhencerEvents {
         
     }
     
+    /// Sends the add to cart event to Enhencer.
+    ///
+    /// - Parameters:
+    ///     - productID: The ID of the product that is being added to the cart.
     public func addedToCart(productID: String) {
         let parameters: [String: Any] = [
             "type": self.type,
@@ -130,6 +154,11 @@ public struct EnhencerEvents {
         
     }
     
+    /// Sends the add to cart event to Enhencer.
+    ///
+    /// - Parameters:
+    ///     - products: An array containing the purchased product dictionaries. Dictionaries has to include 'id', 'quantity' and 'price' fields.
+    ///     Ex: [ 'id': 'product_id', 'quantity': 1, 'price': 15 ]
     public func purchased(products: [[String: Any]] = [[ "id": "no-id", "quantity": 1, "price": 1 ]]) {
         
         let basketID = String(Date().toMilliseconds())
@@ -185,7 +214,10 @@ public struct EnhencerEvents {
     
     private func pushToGoogle (audience: [String:String]){
         // push to firebase
-        Analytics.logEvent(audience["name"]!, parameters: [:])
+        var name = audience["name"]!
+        name = name.replacingOccurrences(of: " ", with: "_")
+        name = name.lowercased()
+        Analytics.logEvent(name, parameters: [:])
     }
     
     
