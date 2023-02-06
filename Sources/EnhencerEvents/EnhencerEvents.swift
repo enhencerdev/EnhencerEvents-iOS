@@ -51,7 +51,6 @@ public struct EnhencerEvents {
     public mutating func config (token: String ){
         self.userID = token
         setTrackingStatus()
-        print(AppEvents.shared)
     }
     
     
@@ -196,8 +195,7 @@ public struct EnhencerEvents {
     }
     
     private func pushResult(apiResponse: [String: Any]) {
-        
-        for aud in apiResponse["audiences"] as! [[String:String]] {
+        for aud in apiResponse["audiences"] as? [[String:String]] ?? [] {
             self.pushToFacebook(audience: aud)
             self.pushToGoogle(audience: aud)
         }
