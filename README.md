@@ -6,3 +6,4 @@ This package helps Enhencer to collect users' behavioural data in order to creat
 Note that, Enhencer does not use any personal or demopgraphic user data.
 
 More info on https://enhencer.com/
+

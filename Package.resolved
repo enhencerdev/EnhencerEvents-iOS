@@ -36,6 +36,7 @@
         "version" : "9.6.0"
       }
     },
+    
     {
       "identity" : "googleappmeasurement",
       "kind" : "remoteSourceControl",

@@ -26,8 +26,9 @@ let package = Package(
             dependencies: [
                 .product(name: "FacebookCore", package: "facebook-ios-sdk"),
             ]),
-        /*.testTarget(
+            // TODO: Test
+        .testTarget(
             name: "ios_collectorTests",
-            dependencies: ["ios_collector"]),*/
+            dependencies: ["ios_collector"]),
     ]
 )
