@@ -55,6 +55,7 @@ public struct EnhencerEvents {
     
     
     private mutating func setTrackingStatus (){
+        
         if #available(iOS 14.0, *) {
             self.advertiserTrackingEnabled = (ATTrackingManager.trackingAuthorizationStatus == .denied) ? 0 : 1
         }
@@ -181,6 +182,7 @@ public struct EnhencerEvents {
     
     
     private func scoreMe() {
+        
         let parameters: [String: Any] = [
             "type": self.type,
             "visitorID": self.visitorID,
@@ -188,9 +190,12 @@ public struct EnhencerEvents {
             "id": self.visitorID,
             "deviceOsVersion": UIDevice.current.systemVersion,
             "deviceType": "i2",
-            "advertiserTrackingEnabled": self.advertiserTrackingEnabled,
             "externalID": self.fbExternalID
         ]
+
+        if (self.advertiserTrackingEnabled) {
+            parameters["advertiserTrackingEnabled"] = self.advertiserTrackingEnabled
+        }
         let _ = sendRequest(toUrl: self.customerUrl + self.visitorID, withParameters: parameters, requestMethod: "PUT", completion: self.pushResult(apiResponse:))
     }
     
